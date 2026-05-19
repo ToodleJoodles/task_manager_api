@@ -1,13 +1,14 @@
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-
 
 
 class Task(db.Model):
@@ -21,7 +22,6 @@ class Task(db.Model):
             "title": self.title,
             "done": self.done
         }
-
 
 
 @app.route("/tasks", methods=["GET"])
@@ -60,28 +60,28 @@ def create_task():
 def update_task(id):
 
     task = db.get_or_404(Task, id)
-    
+
     data = request.get_json()
-    
+
     if 'title' in data:
         task.title = data['title']
     if 'done' in data:
         task.done = data['done']
-        
+
     db.session.commit()
-    
+
     return jsonify({'id': task.id, 'title': task.title, 'done': task.done}), 200
 
 
 @app.route('/tasks/<int:id>', methods=['DELETE'])
 def delete_task(id):
-    
+
     task = db.get_or_404(Task, id)
-    
+
     db.session.delete(task)
-    
+
     db.session.commit()
-    
+
     return jsonify({'message': 'Task deleted successfully'}), 200
 
 
