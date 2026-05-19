@@ -1,25 +1,45 @@
 import { useState, useEffect } from 'react'
 
 function App() {
+
+  
   const [tasks, setTasks] = useState([])
+
+ 
   const [newTaskTitle, setNewTaskTitle] = useState("")
 
+
+  
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const response = await fetch('http://127.0.0.1:5000/tasks')
-        const data = await response.json()
-        setTasks(data.tasks ? data.tasks : (Array.isArray(data) ? data : []))
-      } catch (error) {
-        console.error("Error fetching tasks:", error)
-      }
-    }
-    fetchTasks()
+    loadTasksFromServer()
   }, [])
 
-  const handleAddTask = async (e) => {
-    e.preventDefault()
-    if (newTaskTitle.trim() === "") return 
+
+  
+  async function loadTasksFromServer() {
+    try {
+      const response = await fetch('http://127.0.0.1:5000/tasks')
+      const data = await response.json()
+
+      if (data.tasks) {
+        setTasks(data.tasks)
+      } else if (Array.isArray(data)) {
+        setTasks(data)
+      } else {
+        setTasks([])
+      }
+    } catch (error) {
+      console.error("Error fetching tasks:", error)
+    }
+  }
+
+
+  async function handleAddTask(event) {
+    event.preventDefault()
+
+    if (newTaskTitle.trim() === "") {
+      return
+    }
 
     try {
       const response = await fetch('http://127.0.0.1:5000/tasks', {
@@ -28,34 +48,46 @@ function App() {
         body: JSON.stringify({ title: newTaskTitle })
       })
       const newlyCreatedTask = await response.json()
-      
-      setTasks([...tasks, newlyCreatedTask])
+
+      const updatedTaskList = [...tasks, newlyCreatedTask]
+      setTasks(updatedTaskList)
+
       setNewTaskTitle("")
     } catch (error) {
       console.error("Error adding task:", error)
     }
   }
 
-  const handleToggleDone = async (task) => {
+  async function handleToggleDone(task) {
+    const flippedDoneStatus = !task.done
+
     try {
       const response = await fetch(`http://127.0.0.1:5000/tasks/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        // Send the OPPOSITE of the current status
-        body: JSON.stringify({ done: !task.done }) 
+        body: JSON.stringify({ done: flippedDoneStatus })
       })
       const updatedTask = await response.json()
 
-      setTasks(tasks.map(t => t.id === task.id ? updatedTask : t))
+      const updatedTaskList = tasks.map(function(currentTask) {
+        if (currentTask.id === task.id) {
+          return updatedTask
+        } else {
+          return currentTask
+        }
+      })
+      setTasks(updatedTaskList)
     } catch (error) {
-      console.error("Error toggling status:", error)
+      console.error("Error toggling task status:", error)
     }
   }
 
-  const handleEditTitle = async (task) => {
+  async function handleEditTitle(task) {
     const newTitle = window.prompt("Edit task title:", task.title)
-    
-    if (!newTitle || newTitle.trim() === "" || newTitle === task.title) return
+
+    if (!newTitle || newTitle.trim() === "" || newTitle === task.title) {
+      return
+    }
 
     try {
       const response = await fetch(`http://127.0.0.1:5000/tasks/${task.id}`, {
@@ -65,92 +97,322 @@ function App() {
       })
       const updatedTask = await response.json()
 
-      setTasks(tasks.map(t => t.id === task.id ? updatedTask : t))
+      const updatedTaskList = tasks.map(function(currentTask) {
+        if (currentTask.id === task.id) {
+          return updatedTask
+        } else {
+          return currentTask
+        }
+      })
+      setTasks(updatedTaskList)
     } catch (error) {
-      console.error("Error updating title:", error)
+      console.error("Error updating task title:", error)
     }
   }
 
-  const handleDelete = async (id) => {
+
+  async function handleDelete(taskId) {
     try {
-      // Notice the URL includes the specific ID!
-      await fetch(`http://127.0.0.1:5000/tasks/${id}`, {
+      await fetch(`http://127.0.0.1:5000/tasks/${taskId}`, {
         method: 'DELETE'
       })
 
-      setTasks(tasks.filter(t => t.id !== id))
+      // Keep every task EXCEPT the one that was just deleted
+      const remainingTasks = tasks.filter(function(currentTask) {
+        return currentTask.id !== taskId
+      })
+      setTasks(remainingTasks)
     } catch (error) {
       console.error("Error deleting task:", error)
     }
   }
 
+
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '800px' }}>
-      <h1>Task Manager API Dashboard</h1>
-      
-      <form onSubmit={handleAddTask} style={{ marginBottom: '20px' }}>
-        <input 
-          type="text" 
-          placeholder="Type a new task here..." 
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-          style={{ padding: '8px', width: '70%', marginRight: '10px' }}
-        />
-        <button type="submit" style={{ padding: '8px 16px', cursor: 'pointer' }}>Add Task</button>
-      </form>
+    <div style={styles.pageBackground}>
+      <div style={styles.contentColumn}>
 
-      <h2>My Tasks:</h2>
-      <ul style={{ listStyleType: 'none', padding: 0 }}>
-        {tasks.map(task => (
-          <li key={task.id} style={{ 
-            marginBottom: '10px', 
-            padding: '12px', 
-            border: '1px solid #ccc',
-            borderRadius: '5px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: task.done ? '#f0f8ff' : 'white'
-          }}>
-            
-            {/* Left side: The Task Name */}
-            <span 
-              style={{ textDecoration: task.done ? 'line-through' : 'none', color: task.done ? 'gray' : 'black' }}
-            >
-              <strong>{task.title}</strong>
-            </span>
+      <header style={styles.header}>
+        <div style={styles.headerAccent} />
+        <h1 style={styles.heading}>Task Manager</h1>
+      </header>
 
-            {/* Right side: The Action Buttons */}
-            <div>
-              <button 
-                onClick={() => handleToggleDone(task)} 
-                style={{ marginRight: '5px', cursor: 'pointer' }}
-              >
-                {task.done ? "Undo" : "Mark Done"}
-              </button>
-              
-              <button 
-                onClick={() => handleEditTitle(task)} 
-                style={{ marginRight: '5px', cursor: 'pointer' }}
-              >
-                Edit
-              </button>
-              
-              <button 
-                onClick={() => handleDelete(task.id)} 
-                style={{ cursor: 'pointer', backgroundColor: '#ff4d4d', color: 'white', border: 'none', padding: '3px 8px', borderRadius: '3px' }}
-              >
-                Delete
-              </button>
-            </div>
-            
-          </li>
-        ))}
-      </ul>
-      
-      {tasks.length === 0 && <p>No tasks found. Add one above!</p>}
+      <div style={styles.card}>
+        <p style={styles.sectionLabel}>ADD NEW TASK</p>
+        <form onSubmit={handleAddTask} style={styles.form}>
+          <input
+            type="text"
+            placeholder="What needs to be done?"
+            value={newTaskTitle}
+            onChange={function(event) { setNewTaskTitle(event.target.value) }}
+            style={styles.input}
+          />
+          <button type="submit" style={styles.addButton}>
+            + Add Task
+          </button>
+        </form>
+      </div>
+
+      <div style={styles.card}>
+        <p style={styles.sectionLabel}>
+          MY TASKS
+          <span style={styles.taskCount}>{tasks.length}</span>
+        </p>
+
+        {tasks.length === 0 && (
+          <p style={styles.emptyMessage}>No tasks yet - add one above!</p>
+        )}
+
+        <ul style={styles.taskList}>
+          {tasks.map(function(task) {
+            return (
+              <li key={task.id} style={task.done ? styles.taskItemDone : styles.taskItemActive}>
+
+                <span style={task.done ? styles.taskTitleDone : styles.taskTitleActive}>
+                  {task.title}
+                </span>
+
+                <div style={styles.buttonGroup}>
+                  <button
+                    onClick={function() { handleToggleDone(task) }}
+                    style={task.done ? styles.undoButton : styles.doneButton}
+                  >
+                    {task.done ? "↩ Undo" : "✓ Done"}
+                  </button>
+
+                  <button
+                    onClick={function() { handleEditTitle(task) }}
+                    style={styles.editButton}
+                  >
+                    ✎ Edit
+                  </button>
+
+                  <button
+                    onClick={function() { handleDelete(task.id) }}
+                    style={styles.deleteButton}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+
+      </div>
     </div>
   )
+}
+
+
+const styles = {
+  pageBackground: {
+    minHeight: '100vh',
+    width: '100%',
+    backgroundColor: '#f5f4f0',
+    fontFamily: "'Georgia', serif",
+  },
+
+  contentColumn: {
+    maxWidth: '680px',
+    margin: '0 auto',
+    padding: '40px 20px',
+  },
+
+  header: {
+    position: 'relative',
+    marginBottom: '32px',
+    paddingLeft: '20px',
+  },
+  headerAccent: {
+    position: 'absolute',
+    left: 0,
+    top: '4px',
+    bottom: '4px',
+    width: '4px',
+    backgroundColor: '#c0392b',
+    borderRadius: '2px',
+  },
+  heading: {
+    margin: '0 0 4px 0',
+    fontSize: '2rem',
+    fontWeight: '700',
+    color: '#1a1a1a',
+    letterSpacing: '-0.5px',
+  },
+  subheading: {
+    margin: 0,
+    fontSize: '0.95rem',
+    color: '#888',
+    fontStyle: 'italic',
+  },
+
+  /* Card wrapper */
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: '10px',
+    padding: '24px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+    border: '1px solid #ebebeb',
+  },
+  sectionLabel: {
+    margin: '0 0 16px 0',
+    fontSize: '0.72rem',
+    fontFamily: "'Courier New', monospace",
+    fontWeight: '700',
+    letterSpacing: '1.5px',
+    color: '#aaa',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  taskCount: {
+    backgroundColor: '#f5f4f0',
+    color: '#555',
+    borderRadius: '20px',
+    padding: '1px 9px',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    fontFamily: "'Georgia', serif",
+  },
+
+  /* Add Task form */
+  form: {
+    display: 'flex',
+    gap: '10px',
+  },
+  input: {
+    flex: 1,
+    padding: '10px 14px',
+    fontSize: '0.95rem',
+    border: '1.5px solid #ddd',
+    borderRadius: '6px',
+    outline: 'none',
+    fontFamily: "'Georgia', serif",
+    backgroundColor: '#fafafa',
+    color: '#1a1a1a',
+  },
+  addButton: {
+    padding: '10px 20px',
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    fontFamily: "'Courier New', monospace",
+    letterSpacing: '0.5px',
+    backgroundColor: '#c0392b',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+
+  taskList: {
+    listStyleType: 'none',
+    padding: 0,
+    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  emptyMessage: {
+    color: '#aaa',
+    fontSize: '0.9rem',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: '20px 0',
+    margin: 0,
+  },
+
+  taskItemActive: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 16px',
+    borderRadius: '7px',
+    border: '1.5px solid #e8e8e8',
+    backgroundColor: '#fdfdfd',
+    gap: '12px',
+  },
+  taskItemDone: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 16px',
+    borderRadius: '7px',
+    border: '1.5px solid #e8e8e8',
+    backgroundColor: '#f9f9f7',
+    gap: '12px',
+  },
+
+  taskTitleActive: {
+    fontSize: '0.95rem',
+    color: '#1a1a1a',
+    fontWeight: '500',
+    flex: 1,
+  },
+  taskTitleDone: {
+    fontSize: '0.95rem',
+    color: '#bbb',
+    fontWeight: '500',
+    textDecoration: 'line-through',
+    flex: 1,
+  },
+
+  buttonGroup: {
+    display: 'flex',
+    gap: '6px',
+    flexShrink: 0,
+  },
+  doneButton: {
+    padding: '5px 12px',
+    fontSize: '0.78rem',
+    fontFamily: "'Courier New', monospace",
+    fontWeight: '700',
+    letterSpacing: '0.3px',
+    backgroundColor: '#eafaf1',
+    color: '#27ae60',
+    border: '1.5px solid #a9dfbf',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  undoButton: {
+    padding: '5px 12px',
+    fontSize: '0.78rem',
+    fontFamily: "'Courier New', monospace",
+    fontWeight: '700',
+    letterSpacing: '0.3px',
+    backgroundColor: '#fef9e7',
+    color: '#b7950b',
+    border: '1.5px solid #f9e79f',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  editButton: {
+    padding: '5px 12px',
+    fontSize: '0.78rem',
+    fontFamily: "'Courier New', monospace",
+    fontWeight: '700',
+    letterSpacing: '0.3px',
+    backgroundColor: '#eaf2fb',
+    color: '#2980b9',
+    border: '1.5px solid #aed6f1',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  deleteButton: {
+    padding: '5px 10px',
+    fontSize: '0.82rem',
+    fontFamily: "'Courier New', monospace",
+    fontWeight: '700',
+    backgroundColor: '#fdedec',
+    color: '#c0392b',
+    border: '1.5px solid #f5b7b1',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
 }
 
 export default App
