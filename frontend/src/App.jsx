@@ -4,7 +4,6 @@ function App() {
   const [tasks, setTasks] = useState([])
   const [newTaskTitle, setNewTaskTitle] = useState("")
 
-  // 1. Fetch Initial Data
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -18,7 +17,6 @@ function App() {
     fetchTasks()
   }, [])
 
-  // 2. Add a Task (POST)
   const handleAddTask = async (e) => {
     e.preventDefault()
     if (newTaskTitle.trim() === "") return 
@@ -31,7 +29,6 @@ function App() {
       })
       const newlyCreatedTask = await response.json()
       
-      // Update memory: Copy old tasks, add the new one
       setTasks([...tasks, newlyCreatedTask])
       setNewTaskTitle("")
     } catch (error) {
@@ -39,7 +36,6 @@ function App() {
     }
   }
 
-  // 3. Toggle 'Done' Status (PUT)
   const handleToggleDone = async (task) => {
     try {
       const response = await fetch(`http://127.0.0.1:5000/tasks/${task.id}`, {
@@ -50,19 +46,15 @@ function App() {
       })
       const updatedTask = await response.json()
 
-      // Update memory: Use .map() to find the right task and swap it
       setTasks(tasks.map(t => t.id === task.id ? updatedTask : t))
     } catch (error) {
       console.error("Error toggling status:", error)
     }
   }
 
-  // 4. Edit Title (PUT)
   const handleEditTitle = async (task) => {
-    // Open a simple browser prompt to get the new name
     const newTitle = window.prompt("Edit task title:", task.title)
     
-    // If they hit cancel, or typed nothing, do nothing
     if (!newTitle || newTitle.trim() === "" || newTitle === task.title) return
 
     try {
@@ -73,14 +65,12 @@ function App() {
       })
       const updatedTask = await response.json()
 
-      // Update memory exactly like we did for toggling status
       setTasks(tasks.map(t => t.id === task.id ? updatedTask : t))
     } catch (error) {
       console.error("Error updating title:", error)
     }
   }
 
-  // 5. Delete a Task (DELETE)
   const handleDelete = async (id) => {
     try {
       // Notice the URL includes the specific ID!
@@ -88,14 +78,12 @@ function App() {
         method: 'DELETE'
       })
 
-      // Update memory: Use .filter() to keep everything EXCEPT the deleted ID
       setTasks(tasks.filter(t => t.id !== id))
     } catch (error) {
       console.error("Error deleting task:", error)
     }
   }
 
-  // 6. Paint the UI
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '800px' }}>
       <h1>Task Manager API Dashboard</h1>
