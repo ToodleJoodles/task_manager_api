@@ -2,23 +2,64 @@ import { useState, useEffect } from 'react'
 
 function App() {
 
-  
   const [tasks, setTasks] = useState([])
-
- 
   const [newTaskTitle, setNewTaskTitle] = useState("")
+  const [token, setToken] = useState(localStorage.getItem("token") || null)
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [isLoginMode, setIsLoginMode] = useState(true) 
+  const [authError, setAuthError] = useState("")
 
-
-  
   useEffect(() => {
-    loadTasksFromServer()
-  }, [])
+    if (token) {
+      loadTasksFromServer()
+    }
+  }, [token])
 
+  async function handleAuthSubmit(event) {
+    event.preventDefault()
+    setAuthError("")
+    const endpoint = isLoginMode ? '/login' : '/register'
 
-  
+    try {
+      const response = await fetch(`http://127.0.0.1:5000${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setAuthError(data.error || "Authentication failed")
+        return
+      }
+
+      if (isLoginMode) {
+        localStorage.setItem("token", data.access_token)
+        setToken(data.access_token)
+        setUsername("")
+        setPassword("")
+      } else {
+        alert("Registration successful! You can now log in.")
+        setIsLoginMode(true)
+        setPassword("")
+      }
+    } catch (error) {
+      setAuthError("Network error. Is the Flask server running?")
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("token")
+    setToken(null)
+    setTasks([]) 
+  }
+
   async function loadTasksFromServer() {
     try {
-      const response = await fetch('http://127.0.0.1:5000/tasks')
+      const response = await fetch('http://127.0.0.1:5000/tasks', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
       const data = await response.json()
 
       if (data.tasks) {
@@ -33,25 +74,21 @@ function App() {
     }
   }
 
-
   async function handleAddTask(event) {
     event.preventDefault()
-
-    if (newTaskTitle.trim() === "") {
-      return
-    }
+    if (newTaskTitle.trim() === "") return
 
     try {
       const response = await fetch('http://127.0.0.1:5000/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({ title: newTaskTitle })
       })
       const newlyCreatedTask = await response.json()
-
-      const updatedTaskList = [...tasks, newlyCreatedTask]
-      setTasks(updatedTaskList)
-
+      setTasks([...tasks, newlyCreatedTask])
       setNewTaskTitle("")
     } catch (error) {
       console.error("Error adding task:", error)
@@ -60,23 +97,17 @@ function App() {
 
   async function handleToggleDone(task) {
     const flippedDoneStatus = !task.done
-
     try {
       const response = await fetch(`http://127.0.0.1:5000/tasks/${task.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ done: flippedDoneStatus })
       })
       const updatedTask = await response.json()
-
-      const updatedTaskList = tasks.map(function(currentTask) {
-        if (currentTask.id === task.id) {
-          return updatedTask
-        } else {
-          return currentTask
-        }
-      })
-      setTasks(updatedTaskList)
+      setTasks(tasks.map(t => t.id === task.id ? updatedTask : t))
     } catch (error) {
       console.error("Error toggling task status:", error)
     }
@@ -84,128 +115,142 @@ function App() {
 
   async function handleEditTitle(task) {
     const newTitle = window.prompt("Edit task title:", task.title)
-
-    if (!newTitle || newTitle.trim() === "" || newTitle === task.title) {
-      return
-    }
+    if (!newTitle || newTitle.trim() === "" || newTitle === task.title) return
 
     try {
       const response = await fetch(`http://127.0.0.1:5000/tasks/${task.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ title: newTitle })
       })
       const updatedTask = await response.json()
-
-      const updatedTaskList = tasks.map(function(currentTask) {
-        if (currentTask.id === task.id) {
-          return updatedTask
-        } else {
-          return currentTask
-        }
-      })
-      setTasks(updatedTaskList)
+      setTasks(tasks.map(t => t.id === task.id ? updatedTask : t))
     } catch (error) {
       console.error("Error updating task title:", error)
     }
   }
 
-
   async function handleDelete(taskId) {
     try {
       await fetch(`http://127.0.0.1:5000/tasks/${taskId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       })
-
-      // Keep every task EXCEPT the one that was just deleted
-      const remainingTasks = tasks.filter(function(currentTask) {
-        return currentTask.id !== taskId
-      })
-      setTasks(remainingTasks)
+      setTasks(tasks.filter(t => t.id !== taskId))
     } catch (error) {
       console.error("Error deleting task:", error)
     }
   }
 
-
   return (
     <div style={styles.pageBackground}>
       <div style={styles.contentColumn}>
 
-      <header style={styles.header}>
-        <div style={styles.headerAccent} />
-        <h1 style={styles.heading}>Task Manager</h1>
-      </header>
+        <header style={styles.header}>
+          <div style={styles.headerAccent} />
+          <h1 style={styles.heading}>Task Manager</h1>
+          
+          {token && (
+            <button onClick={handleLogout} style={styles.logoutButton}>
+              Log Out
+            </button>
+          )}
+        </header>
 
-      <div style={styles.card}>
-        <p style={styles.sectionLabel}>ADD NEW TASK</p>
-        <form onSubmit={handleAddTask} style={styles.form}>
-          <input
-            type="text"
-            placeholder="What needs to be done?"
-            value={newTaskTitle}
-            onChange={function(event) { setNewTaskTitle(event.target.value) }}
-            style={styles.input}
-          />
-          <button type="submit" style={styles.addButton}>
-            + Add Task
-          </button>
-        </form>
-      </div>
+        {!token ? (
+          <div style={styles.card}>
+            <p style={styles.sectionLabel}>{isLoginMode ? 'SECURE LOGIN' : 'CREATE ACCOUNT'}</p>
+            
+            {authError && <p style={styles.errorText}>{authError}</p>}
+            
+            <form onSubmit={handleAuthSubmit} style={styles.authForm}>
+              <input
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <button type="submit" style={styles.addButton}>
+                {isLoginMode ? 'Login to Dashboard' : 'Register Account'}
+              </button>
+            </form>
 
-      <div style={styles.card}>
-        <p style={styles.sectionLabel}>
-          MY TASKS
-          <span style={styles.taskCount}>{tasks.length}</span>
-        </p>
+            <button 
+              onClick={() => setIsLoginMode(!isLoginMode)} 
+              style={styles.toggleModeButton}
+            >
+              {isLoginMode ? "Need an account? Register here." : "Already have an account? Log in."}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={styles.card}>
+              <p style={styles.sectionLabel}>ADD NEW TASK</p>
+              <form onSubmit={handleAddTask} style={styles.form}>
+                <input
+                  type="text"
+                  placeholder="What needs to be done?"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  style={styles.input}
+                />
+                <button type="submit" style={styles.addButton}>
+                  + Add Task
+                </button>
+              </form>
+            </div>
 
-        {tasks.length === 0 && (
-          <p style={styles.emptyMessage}>No tasks yet - add one above!</p>
+            <div style={styles.card}>
+              <p style={styles.sectionLabel}>
+                MY TASKS
+                <span style={styles.taskCount}>{tasks.length}</span>
+              </p>
+
+              {tasks.length === 0 && (
+                <p style={styles.emptyMessage}>No tasks yet - add one above!</p>
+              )}
+
+              <ul style={styles.taskList}>
+                {tasks.map((task) => (
+                  <li key={task.id} style={task.done ? styles.taskItemDone : styles.taskItemActive}>
+                    <span style={task.done ? styles.taskTitleDone : styles.taskTitleActive}>
+                      {task.title}
+                    </span>
+                    <div style={styles.buttonGroup}>
+                      <button onClick={() => handleToggleDone(task)} style={task.done ? styles.undoButton : styles.doneButton}>
+                        {task.done ? "↩ Undo" : "✓ Done"}
+                      </button>
+                      <button onClick={() => handleEditTitle(task)} style={styles.editButton}>
+                        ✎ Edit
+                      </button>
+                      <button onClick={() => handleDelete(task.id)} style={styles.deleteButton}>
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         )}
-
-        <ul style={styles.taskList}>
-          {tasks.map(function(task) {
-            return (
-              <li key={task.id} style={task.done ? styles.taskItemDone : styles.taskItemActive}>
-
-                <span style={task.done ? styles.taskTitleDone : styles.taskTitleActive}>
-                  {task.title}
-                </span>
-
-                <div style={styles.buttonGroup}>
-                  <button
-                    onClick={function() { handleToggleDone(task) }}
-                    style={task.done ? styles.undoButton : styles.doneButton}
-                  >
-                    {task.done ? "↩ Undo" : "✓ Done"}
-                  </button>
-
-                  <button
-                    onClick={function() { handleEditTitle(task) }}
-                    style={styles.editButton}
-                  >
-                    ✎ Edit
-                  </button>
-
-                  <button
-                    onClick={function() { handleDelete(task.id) }}
-                    style={styles.deleteButton}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-              </li>
-            )
-          })}
-        </ul>
-      </div>
 
       </div>
     </div>
   )
 }
-
 
 const styles = {
   pageBackground: {
@@ -214,17 +259,18 @@ const styles = {
     backgroundColor: '#f5f4f0',
     fontFamily: "'Georgia', serif",
   },
-
   contentColumn: {
     maxWidth: '680px',
     margin: '0 auto',
     padding: '40px 20px',
   },
-
   header: {
     position: 'relative',
     marginBottom: '32px',
     paddingLeft: '20px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerAccent: {
     position: 'absolute',
@@ -236,20 +282,23 @@ const styles = {
     borderRadius: '2px',
   },
   heading: {
-    margin: '0 0 4px 0',
+    margin: '0',
     fontSize: '2rem',
     fontWeight: '700',
     color: '#1a1a1a',
     letterSpacing: '-0.5px',
   },
-  subheading: {
-    margin: 0,
-    fontSize: '0.95rem',
-    color: '#888',
-    fontStyle: 'italic',
+  logoutButton: {
+    padding: '6px 12px',
+    fontSize: '0.8rem',
+    fontFamily: "'Courier New', monospace",
+    fontWeight: '700',
+    backgroundColor: 'transparent',
+    color: '#c0392b',
+    border: '1.5px solid #c0392b',
+    borderRadius: '6px',
+    cursor: 'pointer',
   },
-
-  /* Card wrapper */
   card: {
     backgroundColor: '#ffffff',
     borderRadius: '10px',
@@ -278,11 +327,14 @@ const styles = {
     fontWeight: '600',
     fontFamily: "'Georgia', serif",
   },
-
-  /* Add Task form */
   form: {
     display: 'flex',
     gap: '10px',
+  },
+  authForm: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
   },
   input: {
     flex: 1,
@@ -308,7 +360,23 @@ const styles = {
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
-
+  toggleModeButton: {
+    marginTop: '16px',
+    background: 'none',
+    border: 'none',
+    color: '#2980b9',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontFamily: "'Georgia', serif",
+    fontSize: '0.9rem',
+    padding: 0,
+  },
+  errorText: {
+    color: '#c0392b',
+    fontSize: '0.85rem',
+    marginBottom: '12px',
+    fontFamily: "'Georgia', serif",
+  },
   taskList: {
     listStyleType: 'none',
     padding: 0,
@@ -325,7 +393,6 @@ const styles = {
     padding: '20px 0',
     margin: 0,
   },
-
   taskItemActive: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -346,7 +413,6 @@ const styles = {
     backgroundColor: '#f9f9f7',
     gap: '12px',
   },
-
   taskTitleActive: {
     fontSize: '0.95rem',
     color: '#1a1a1a',
@@ -360,7 +426,6 @@ const styles = {
     textDecoration: 'line-through',
     flex: 1,
   },
-
   buttonGroup: {
     display: 'flex',
     gap: '6px',
