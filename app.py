@@ -76,65 +76,64 @@ def login():
     return jsonify({"error": "Invalid username or password"}), 401
 
 
-@app.route("/tasks", methods=["GET"])
-def get_all_tasks():
-    all_tasks = Task.query.all()
+@app.route('/tasks', methods=['GET'])
+@jwt_required()
+def get_tasks():
+    current_user_id = get_jwt_identity()
 
-    task_list = [task.to_dict() for task in all_tasks]
+    tasks = Task.query.filter_by(user_id=current_user_id).all()
 
-    return jsonify({"tasks": task_list})
-
-
-@app.route("/tasks/<int:task_id>", methods=["GET"])
-def get_single_task(task_id):
-    task = Task.query.get(task_id)
-
-    if task:
-        return jsonify(task.to_dict())
-    else:
-        return jsonify({"error": "Task not found"}), 404
+    tasks_list = [{"id": task.id, "title": task.title,
+                   "done": task.done} for task in tasks]
+    return jsonify({"tasks": tasks_list})
 
 
-@app.route("/tasks", methods=["POST"])
+@app.route('/tasks', methods=['POST'])
+@jwt_required()
 def create_task():
+    current_user_id = get_jwt_identity()
     data = request.get_json()
 
-    new_task = Task(title=data["title"])
-
+    new_task = Task(title=data['title'], user_id=current_user_id)
     db.session.add(new_task)
-
     db.session.commit()
 
-    return jsonify(new_task.to_dict()), 201
+    return jsonify({"id": new_task.id, "title": new_task.title, "done": new_task.done}), 201
 
 
 @app.route('/tasks/<int:id>', methods=['PUT'])
+@jwt_required()
 def update_task(id):
+    current_user_id = get_jwt_identity()
 
-    task = db.get_or_404(Task, id)
+    task = Task.query.filter_by(id=id, user_id=current_user_id).first()
+
+    if not task:
+        return jsonify({"error": "Task not found or unauthorized"}), 404
 
     data = request.get_json()
-
     if 'title' in data:
         task.title = data['title']
     if 'done' in data:
         task.done = data['done']
 
     db.session.commit()
-
-    return jsonify({'id': task.id, 'title': task.title, 'done': task.done}), 200
+    return jsonify({"id": task.id, "title": task.title, "done": task.done})
 
 
 @app.route('/tasks/<int:id>', methods=['DELETE'])
+@jwt_required()
 def delete_task(id):
+    current_user_id = get_jwt_identity()
 
-    task = db.get_or_404(Task, id)
+    task = Task.query.filter_by(id=id, user_id=current_user_id).first()
+
+    if not task:
+        return jsonify({"error": "Task not found or unauthorized"}), 404
 
     db.session.delete(task)
-
     db.session.commit()
-
-    return jsonify({'message': 'Task deleted successfully'}), 200
+    return jsonify({"message": "Task deleted"})
 
 
 if __name__ == "__main__":
