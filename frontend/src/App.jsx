@@ -9,6 +9,7 @@ function App() {
   const [password, setPassword] = useState("")
   const [isLoginMode, setIsLoginMode] = useState(true) 
   const [authError, setAuthError] = useState("")
+  const [role, setRole] = useState(localStorage.getItem("role") || null) 
 
   useEffect(() => {
     if (token) {
@@ -33,13 +34,16 @@ function App() {
         setAuthError(data.error || "Authentication failed")
         return
       }
-
       if (isLoginMode) {
         localStorage.setItem("token", data.access_token)
+        localStorage.setItem("role", data.role) 
         setToken(data.access_token)
+        setRole(data.role)                    
         setUsername("")
         setPassword("")
-      } else {
+      }   
+
+      else {
         alert("Registration successful! You can now log in.")
         setIsLoginMode(true)
         setPassword("")
@@ -51,8 +55,10 @@ function App() {
 
   function handleLogout() {
     localStorage.removeItem("token")
+    localStorage.removeItem("role")
     setToken(null)
-    setTasks([]) 
+    setRole(null)
+    setTasks([])
   }
 
   async function loadTasksFromServer() {
@@ -197,21 +203,24 @@ function App() {
           </div>
         ) : (
           <div>
-            <div style={styles.card}>
-              <p style={styles.sectionLabel}>ADD NEW TASK</p>
-              <form onSubmit={handleAddTask} style={styles.form}>
-                <input
-                  type="text"
-                  placeholder="What needs to be done?"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  style={styles.input}
-                />
-                <button type="submit" style={styles.addButton}>
-                  + Add Task
-                </button>
-              </form>
-            </div>
+            
+            {role === 'admin' && (
+              <div style={styles.card}>
+                <p style={styles.sectionLabel}>ADD NEW TASK</p>
+                <form onSubmit={handleAddTask} style={styles.form}>
+                  <input
+                    type="text"
+                    placeholder="What needs to be done?"
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    style={styles.input}
+                  />
+                  <button type="submit" style={styles.addButton}>
+                    + Add Task
+                  </button>
+                </form>
+              </div>
+            )}
 
             <div style={styles.card}>
               <p style={styles.sectionLabel}>
@@ -220,7 +229,7 @@ function App() {
               </p>
 
               {tasks.length === 0 && (
-                <p style={styles.emptyMessage}>No tasks yet - add one above!</p>
+                <p style={styles.emptyMessage}>No tasks yet.</p>
               )}
 
               <ul style={styles.taskList}>
@@ -229,17 +238,24 @@ function App() {
                     <span style={task.done ? styles.taskTitleDone : styles.taskTitleActive}>
                       {task.title}
                     </span>
+                    
                     <div style={styles.buttonGroup}>
                       <button onClick={() => handleToggleDone(task)} style={task.done ? styles.undoButton : styles.doneButton}>
                         {task.done ? "↩ Undo" : "✓ Done"}
                       </button>
-                      <button onClick={() => handleEditTitle(task)} style={styles.editButton}>
-                        ✎ Edit
-                      </button>
-                      <button onClick={() => handleDelete(task.id)} style={styles.deleteButton}>
-                        ✕
-                      </button>
+
+                      {role === 'admin' && (
+                        <>
+                          <button onClick={() => handleEditTitle(task)} style={styles.editButton}>
+                            ✎ Edit
+                          </button>
+                          <button onClick={() => handleDelete(task.id)} style={styles.deleteButton}>
+                            ✕
+                          </button>
+                        </>
+                      )}
                     </div>
+                    
                   </li>
                 ))}
               </ul>
