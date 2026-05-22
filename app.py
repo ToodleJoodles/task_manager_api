@@ -30,7 +30,6 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     done = db.Column(db.Boolean, default=False)
-
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 
@@ -49,7 +48,7 @@ def register():
     hashed_password = bcrypt.generate_password_hash(
         data['password']).decode('utf-8')
     assigned_role = 'admin' if data['username'].lower(
-    ) == 'tejas' else 'viewer'
+    ) == 'admin' else 'viewer'
 
     new_user = User(username=data['username'],
                     password_hash=hashed_password, role=assigned_role)
@@ -109,7 +108,7 @@ def create_task():
 @jwt_required()
 def update_task(id):
     claims = get_jwt()
-    user_role = claims.get("role")   
+    user_role = claims.get("role")
     task = db.get_or_404(Task, id)
     data = request.get_json()
     if user_role != "admin":
@@ -117,13 +116,13 @@ def update_task(id):
             return jsonify({"error": "Only admins can edit task titles"}), 403
         if 'done' in data:
             task.done = data['done']
-            
+
     else:
-        if 'title' in data: 
+        if 'title' in data:
             task.title = data['title']
-        if 'done' in data: 
+        if 'done' in data:
             task.done = data['done']
-            
+
     db.session.commit()
     return jsonify({"id": task.id, "title": task.title, "done": task.done})
 
