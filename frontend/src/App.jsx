@@ -7,7 +7,7 @@ function App() {
   const [users, setUsers] = useState([])
   const [employees, setEmployees] = useState([])
   const [newTaskTitle, setNewTaskTitle] = useState("")
-  const [newTaskDeadline, setNewTaskDeadline] = useState("")
+  const [newTaskDurationDays, setNewTaskDurationDays] = useState("")
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const [selectedSupervisorId, setSelectedSupervisorId] = useState("")
   const [selectedAdminEmployeeId, setSelectedAdminEmployeeId] = useState("")
@@ -192,8 +192,8 @@ function App() {
     event.preventDefault()
     setPageError("")
 
-    if (newTaskTitle.trim() === "" || !selectedEmployeeId || !newTaskDeadline) {
-      setPageError("Task title, employee, and deadline are required.")
+    if (newTaskTitle.trim() === "" || !selectedEmployeeId || !newTaskDurationDays) {
+      setPageError("Task title, employee, and completion period are required.")
       return
     }
 
@@ -203,12 +203,12 @@ function App() {
         body: JSON.stringify({
           title: newTaskTitle,
           assigned_to_id: Number(selectedEmployeeId),
-          deadline: newTaskDeadline,
+          duration_days: Number(newTaskDurationDays),
         }),
       })
       setTasks([...tasks, newlyCreatedTask])
       setNewTaskTitle("")
-      setNewTaskDeadline("")
+      setNewTaskDurationDays("")
     } catch (error) {
       setPageError(error.message)
     }
@@ -234,11 +234,11 @@ function App() {
     const newTitle = window.prompt("Edit task title:", task.title)
     if (!newTitle || newTitle.trim() === "") return
 
-    const newDeadline = window.prompt(
-      "Edit deadline as YYYY-MM-DDTHH:MM:",
-      toDateTimeLocalValue(task.deadline),
+    const newDurationDays = window.prompt(
+      "Reset deadline to how many days from now?",
+      "1",
     )
-    if (!newDeadline) return
+    if (!newDurationDays) return
 
     setPageError("")
 
@@ -247,7 +247,7 @@ function App() {
         method: 'PUT',
         body: JSON.stringify({
           title: newTitle,
-          deadline: newDeadline,
+          duration_days: Number(newDurationDays),
         }),
       })
       setTasks(tasks.map((currentTask) => (
@@ -481,9 +481,12 @@ function App() {
               </select>
 
               <input
-                type="datetime-local"
-                value={newTaskDeadline}
-                onChange={(event) => setNewTaskDeadline(event.target.value)}
+                type="number"
+                min="0.25"
+                step="0.25"
+                placeholder="Complete within how many days?"
+                value={newTaskDurationDays}
+                onChange={(event) => setNewTaskDurationDays(event.target.value)}
                 style={styles.input}
               />
 
@@ -559,13 +562,6 @@ function App() {
 function formatDate(value) {
   if (!value) return "No deadline"
   return new Date(value).toLocaleString()
-}
-
-function toDateTimeLocalValue(value) {
-  if (!value) return ""
-  const date = new Date(value)
-  const timezoneOffset = date.getTimezoneOffset() * 60000
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16)
 }
 
 const styles = {

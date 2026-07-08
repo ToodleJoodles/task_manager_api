@@ -82,6 +82,18 @@ def parse_datetime(value):
         return None
 
 
+def calculate_deadline_from_duration(duration_days):
+    try:
+        days = float(duration_days)
+    except (TypeError, ValueError):
+        return None
+
+    if days <= 0:
+        return None
+
+    return datetime.now() + timedelta(days=days)
+
+
 def serialize_user(user, include_relationships=False):
     user_data = {
         "id": user.id,
@@ -359,8 +371,8 @@ def create_task():
         return jsonify({"error": "Supervisor access required"}), 403
 
     data = request.get_json()
-    if not data or not data.get('title') or not data.get('assigned_to_id') or not data.get('deadline'):
-        return jsonify({"error": "Title, assigned_to_id, and deadline are required"}), 400
+    if not data or not data.get('title') or not data.get('assigned_to_id') or not data.get('duration_days'):
+        return jsonify({"error": "Title, assigned_to_id, and duration_days are required"}), 400
 
     employee = db.session.get(User, data['assigned_to_id'])
     if not employee or employee.role != ROLE_EMPLOYEE:
@@ -369,9 +381,9 @@ def create_task():
     if not supervisor_has_employee(current_user, employee):
         return jsonify({"error": "Employee is not assigned to this supervisor"}), 403
 
-    deadline = parse_datetime(data['deadline'])
+    deadline = calculate_deadline_from_duration(data['duration_days'])
     if not deadline:
-        return jsonify({"error": "Deadline must be a valid ISO date/time"}), 400
+        return jsonify({"error": "duration_days must be a number greater than 0"}), 400
 
     new_task = Task(
         title=data['title'],
@@ -409,10 +421,10 @@ def update_task(id):
             return jsonify({"error": "You can only edit tasks you created"}), 403
         if 'title' in data:
             task.title = data['title']
-        if 'deadline' in data:
-            deadline = parse_datetime(data['deadline'])
+        if 'duration_days' in data:
+            deadline = calculate_deadline_from_duration(data['duration_days'])
             if not deadline:
-                return jsonify({"error": "Deadline must be a valid ISO date/time"}), 400
+                return jsonify({"error": "duration_days must be a number greater than 0"}), 400
             task.deadline = deadline
         if 'assigned_to_id' in data:
             employee = db.session.get(User, data['assigned_to_id'])
@@ -427,10 +439,10 @@ def update_task(id):
     elif current_user.role == ROLE_ADMIN:
         if 'title' in data:
             task.title = data['title']
-        if 'deadline' in data:
-            deadline = parse_datetime(data['deadline'])
+        if 'duration_days' in data:
+            deadline = calculate_deadline_from_duration(data['duration_days'])
             if not deadline:
-                return jsonify({"error": "Deadline must be a valid ISO date/time"}), 400
+                return jsonify({"error": "duration_days must be a number greater than 0"}), 400
             task.deadline = deadline
         if 'done' in data:
             set_task_done_status(task, bool(data['done']))
