@@ -7,7 +7,8 @@ function App() {
   const [users, setUsers] = useState([])
   const [employees, setEmployees] = useState([])
   const [newTaskTitle, setNewTaskTitle] = useState("")
-  const [newTaskDurationDays, setNewTaskDurationDays] = useState("")
+  const [newTaskDurationDays, setNewTaskDurationDays] = useState("0")
+  const [newTaskDurationHours, setNewTaskDurationHours] = useState("0")
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const [selectedSupervisorId, setSelectedSupervisorId] = useState("")
   const [selectedAdminEmployeeId, setSelectedAdminEmployeeId] = useState("")
@@ -192,7 +193,12 @@ function App() {
     event.preventDefault()
     setPageError("")
 
-    if (newTaskTitle.trim() === "" || !selectedEmployeeId || !newTaskDurationDays) {
+    const durationDays = calculateDurationDays(
+      newTaskDurationDays,
+      newTaskDurationHours,
+    )
+
+    if (newTaskTitle.trim() === "" || !selectedEmployeeId || durationDays <= 0) {
       setPageError("Task title, employee, and completion period are required.")
       return
     }
@@ -203,12 +209,13 @@ function App() {
         body: JSON.stringify({
           title: newTaskTitle,
           assigned_to_id: Number(selectedEmployeeId),
-          duration_days: Number(newTaskDurationDays),
+          duration_days: durationDays,
         }),
       })
       setTasks([...tasks, newlyCreatedTask])
       setNewTaskTitle("")
-      setNewTaskDurationDays("")
+      setNewTaskDurationDays("0")
+      setNewTaskDurationHours("0")
     } catch (error) {
       setPageError(error.message)
     }
@@ -235,10 +242,22 @@ function App() {
     if (!newTitle || newTitle.trim() === "") return
 
     const newDurationDays = window.prompt(
-      "Reset deadline to how many days from now?",
+      "Reset deadline: days from now?",
+      "0",
+    )
+    if (newDurationDays === null) return
+
+    const newDurationHours = window.prompt(
+      "Reset deadline: hours from now?",
       "1",
     )
-    if (!newDurationDays) return
+    if (newDurationHours === null) return
+
+    const durationDays = calculateDurationDays(newDurationDays, newDurationHours)
+    if (durationDays <= 0) {
+      setPageError("Completion period must be greater than 0.")
+      return
+    }
 
     setPageError("")
 
@@ -247,7 +266,7 @@ function App() {
         method: 'PUT',
         body: JSON.stringify({
           title: newTitle,
-          duration_days: Number(newDurationDays),
+          duration_days: durationDays,
         }),
       })
       setTasks(tasks.map((currentTask) => (
@@ -480,15 +499,28 @@ function App() {
                 ))}
               </select>
 
-              <input
-                type="number"
-                min="0.25"
-                step="0.25"
-                placeholder="Complete within how many days?"
-                value={newTaskDurationDays}
-                onChange={(event) => setNewTaskDurationDays(event.target.value)}
-                style={styles.input}
-              />
+              <div style={styles.durationRow}>
+                <span style={styles.durationLabel}>Finish within</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={newTaskDurationDays}
+                  onChange={(event) => setNewTaskDurationDays(event.target.value)}
+                  style={styles.durationInput}
+                />
+                <span style={styles.durationLabel}>days and</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="23"
+                  step="1"
+                  value={newTaskDurationHours}
+                  onChange={(event) => setNewTaskDurationHours(event.target.value)}
+                  style={styles.durationInput}
+                />
+                <span style={styles.durationLabel}>hours</span>
+              </div>
 
               <button type="submit" style={styles.addButton}>
                 + Add Task
@@ -526,7 +558,7 @@ function App() {
                   {task.title}
                 </span>
                 <p style={styles.metaText}>
-                  Assigned to {task.assigned_to?.username || "unknown"} | Due {formatDate(task.deadline)}
+                  Assigned to {task.assigned_to?.username || "unknown"} by {task.created_by?.username || "unknown"} | Due {formatDate(task.deadline)}
                 </p>
                 {task.is_overdue && <p style={styles.lateText}>Overdue</p>}
                 {task.completed_late && <p style={styles.lateText}>Completed late</p>}
@@ -562,6 +594,17 @@ function App() {
 function formatDate(value) {
   if (!value) return "No deadline"
   return new Date(value).toLocaleString()
+}
+
+function calculateDurationDays(days, hours) {
+  const parsedDays = Number(days)
+  const parsedHours = Number(hours)
+
+  if (Number.isNaN(parsedDays) || Number.isNaN(parsedHours)) {
+    return 0
+  }
+
+  return parsedDays + parsedHours / 24
 }
 
 const styles = {
@@ -669,6 +712,31 @@ const styles = {
     fontFamily: "'Georgia', serif",
     backgroundColor: '#fafafa',
     color: '#1a1a1a',
+  },
+  durationRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+    padding: '10px 14px',
+    border: '1.5px solid #ddd',
+    borderRadius: '6px',
+    backgroundColor: '#fafafa',
+  },
+  durationInput: {
+    width: '70px',
+    padding: '8px 10px',
+    fontSize: '0.95rem',
+    border: '1.5px solid #ddd',
+    borderRadius: '6px',
+    outline: 'none',
+    fontFamily: "'Georgia', serif",
+    backgroundColor: '#fff',
+    color: '#1a1a1a',
+  },
+  durationLabel: {
+    color: '#555',
+    fontSize: '0.9rem',
   },
   select: {
     padding: '8px 10px',
