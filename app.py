@@ -171,6 +171,15 @@ def clear_user_relationships_for_role_change(user):
         supervisor.assigned_employees.remove(user)
 
 
+def delete_user_related_tasks(user):
+    related_tasks = Task.query.filter(
+        (Task.created_by_id == user.id) | (Task.assigned_to_id == user.id)
+    ).all()
+
+    for task in related_tasks:
+        db.session.delete(task)
+
+
 with app.app_context():
     db.create_all()
 
@@ -258,6 +267,25 @@ def update_user_role(user_id):
 
     db.session.commit()
     return jsonify(serialize_user(target_user, include_relationships=True))
+
+
+@app.route('/users/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    current_user, error_response = admin_required()
+    if error_response:
+        return error_response
+
+    target_user = db.get_or_404(User, user_id)
+    if target_user.id == current_user.id or target_user.role == ROLE_ADMIN:
+        return jsonify({"error": "The admin account cannot be deleted"}), 403
+
+    clear_user_relationships_for_role_change(target_user)
+    delete_user_related_tasks(target_user)
+    db.session.delete(target_user)
+    db.session.commit()
+
+    return jsonify({"message": "User deleted"})
 
 
 @app.route('/supervisors/<int:supervisor_id>/employees', methods=['GET'])

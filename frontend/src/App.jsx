@@ -156,6 +156,21 @@ function App() {
     }
   }
 
+  async function handleDeleteUser(user) {
+    const confirmed = window.confirm(`Delete account for ${user.username}? Related tasks will also be deleted.`)
+    if (!confirmed) return
+
+    setPageError("")
+
+    try {
+      await apiRequest(`/users/${user.id}`, { method: 'DELETE' })
+      await loadUsers()
+      await loadTasksFromServer()
+    } catch (error) {
+      setPageError(error.message)
+    }
+  }
+
   async function handleAssignEmployee(event) {
     event.preventDefault()
     setPageError("")
@@ -383,14 +398,22 @@ function App() {
                 </div>
 
                 {user.role !== 'admin' && (
-                  <select
-                    value={user.role}
-                    onChange={(event) => handleRoleChange(user.id, event.target.value)}
-                    style={styles.select}
-                  >
-                    <option value="employee">employee</option>
-                    <option value="supervisor">supervisor</option>
-                  </select>
+                  <div style={styles.userActions}>
+                    <select
+                      value={user.role}
+                      onChange={(event) => handleRoleChange(user.id, event.target.value)}
+                      style={styles.select}
+                    >
+                      <option value="employee">employee</option>
+                      <option value="supervisor">supervisor</option>
+                    </select>
+                    <button
+                      onClick={() => handleDeleteUser(user)}
+                      style={styles.deleteButton}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 )}
               </li>
             ))}
@@ -813,6 +836,13 @@ const styles = {
     border: '1.5px solid #e8e8e8',
     backgroundColor: '#fdfdfd',
     gap: '12px',
+  },
+  userActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   teamItem: {
     display: 'flex',
