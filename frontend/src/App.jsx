@@ -203,7 +203,7 @@ function App() {
         body: JSON.stringify({
           title: newTaskTitle,
           assigned_to_id: Number(selectedEmployeeId),
-          deadline: new Date(newTaskDeadline).toISOString(),
+          deadline: newTaskDeadline,
         }),
       })
       setTasks([...tasks, newlyCreatedTask])
@@ -247,7 +247,7 @@ function App() {
         method: 'PUT',
         body: JSON.stringify({
           title: newTitle,
-          deadline: new Date(newDeadline).toISOString(),
+          deadline: newDeadline,
         }),
       })
       setTasks(tasks.map((currentTask) => (

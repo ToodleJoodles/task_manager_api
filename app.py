@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import os
 
 
@@ -74,7 +74,10 @@ def parse_datetime(value):
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+        parsed_datetime = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        if parsed_datetime.tzinfo is not None:
+            parsed_datetime = parsed_datetime.astimezone().replace(tzinfo=None)
+        return parsed_datetime
     except ValueError:
         return None
 
@@ -100,14 +103,9 @@ def serialize_user(user, include_relationships=False):
 
 
 def serialize_task(task):
-    now = datetime.now(timezone.utc)
+    now = datetime.now()
     deadline = task.deadline
-    if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
-
     completed_at = task.completed_at
-    if completed_at and completed_at.tzinfo is None:
-        completed_at = completed_at.replace(tzinfo=timezone.utc)
 
     return {
         "id": task.id,
@@ -142,7 +140,7 @@ def supervisor_has_employee(supervisor, employee):
 def set_task_done_status(task, done):
     task.done = done
     if done:
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now()
     else:
         task.completed_at = None
 
